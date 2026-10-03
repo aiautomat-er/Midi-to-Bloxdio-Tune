@@ -12,7 +12,7 @@ function parseMidi(buffer) {
   const format = view.getUint16(i), tracksCount = view.getUint16(i + 2), division = view.getUint16(i + 4); i = head.end;
   if (division & 0x8000) throw new Error('SMPTE-timed MIDI files are not supported.');
   const tracks = [], tempos = [{tick:0, microseconds:500000}];
-  for (let t = 0; t < tracksCount; t++) { const c = chunk(); if (c.id !== 'MTrk') throw new Error('Invalid MIDI track.'); let tick = 0, running = 0, name = `Track ${t + 1}`, open = new Map(), notes = [];
+  for (let t = 0; t < tracksCount; thttps://github.com/aiautomat-er/Midi-to-Bloxdio-Tune/pull/2/conflict?name=index.html&base_oid=a0069b60059bcec4aad253ae4b18fe036d4552b5&head_oid=19cad7420de0b8a002fffb91af784548df4d6e87++) { const c = chunk(); if (c.id !== 'MTrk') throw new Error('Invalid MIDI track.'); let tick = 0, running = 0, name = `Track ${t + 1}`, open = new Map(), notes = [];
     while (i < c.end) { tick += readVar(bytes,{get i(){return i},set i(v){i=v}}); let status = bytes[i++]; if (status < 0x80) { i--; status = running; } else if (status < 0xf0) running = status;
       if (status === 0xff) { const type=bytes[i++], len=readVar(bytes,{get i(){return i},set i(v){i=v}}); if (type===0x51 && len===3) tempos.push({tick,microseconds:(bytes[i]<<16)|(bytes[i+1]<<8)|bytes[i+2]}); if ((type===0x03 || type===0x04) && len) name=text(bytes,i,len); i+=len; }
       else if (status === 0xf0 || status === 0xf7) i += readVar(bytes,{get i(){return i},set i(v){i=v}});
