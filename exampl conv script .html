@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MIDI to Bloxd Converter</title>
+<style>
+  body {
+    background: #c0c0c0;
+    color: #000000;
+    font-family: "MS Sans Serif", "Tahoma", Geneva, sans-serif;
+    margin: 0;
+    padding: 20px;
+    font-size: 12px;
+  }
+  .wrap { width: 100%; max-width: 700px; margin: 0 auto; }
+  h1 {
+    font-size: 16px;
+    margin: 0 0 2px;
+    font-weight: bold;
+  }
+  .sub {
+    color: #000000;
+    font-size: 11px;
+    margin: 0 0 14px;
+  }
+  .panel {
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    margin: 0 0 8px;
+    font-weight: bold;
+    background: #000080;
+    color: #ffffff;
+    padding: 2px 6px;
+  }
+  .drop {
+    border: 2px inset #808080;
+    background: #ffffff;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .drop input { display: none; }
+  .drop .label { font-size: 11px; }
+  .drop .hint { font-size: 10px; color: #444444; margin-top: 2px; }
+  .filename { font-family: "Courier New", monospace; font-size: 11px; color: #000080; margin-top: 6px; }
+
+  .track-row {
+    display: flex;
+    align-items: center;
+    padding: 3px 4px;
+    font-size: 11px;
+    border-bottom: 1px solid #808080;
+  }
+  .track-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; flex: 1; }
+  .track-row .meta { color: #444444; font-family: "Courier New", monospace; font-size: 10px; }
+
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 11px; margin-bottom: 4px; }
+  .field .row { display: flex; gap: 8px; align-items: center; }
+  input[type=range] { flex: 1; }
+  .val { font-family: "Courier New", monospace; font-size: 11px; min-width: 50px; text-align: right; }
+
+  button {
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #ffffff #808080 #808080 #ffffff;
+    padding: 4px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: "MS Sans Serif", Tahoma, sans-serif;
+  }
+  button:active {
+    border-color: #808080 #ffffff #ffffff #808080;
+  }
+  button:disabled { color: #808080; cursor: not-allowed; }
+
+  .code-box {
+    display: flex;
+    border: 2px inset #808080;
+    background: #ffffff;
+    max-height: 380px;
+    overflow: auto;
+  }
+  .code-box .gutter {
+    background: #dddddd;
+    color: #666666;
+    text-align: right;
+    padding: 6px 6px 6px 4px;
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    user-select: none;
+    border-right: 1px solid #999999;
+    white-space: pre;
+  }
+  .code-box pre {
+    margin: 0;
+    padding: 6px 8px;
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #000080;
+    white-space: pre;
+  }
+  .actions { display: flex; gap: 6px; margin-top: 8px; }
+  .note { font-size: 10px; color: #333333; margin-top: 8px; }
+  .status { font-size: 11px; }
+  hr { border: none; border-top: 1px solid #808080; border-bottom: 1px solid #ffffff; margin: 10px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MIDI to Bloxd Converter</h1>
+  <p class="sub">Runs entirely in your browser. The MIDI file is parsed locally and never leaves this page.</p>
+
+  <div class="panel">
+    <h2>1. Load your MIDI file</h2>
+    <div class="drop" id="dropZone">
+      <input type="file" id="fileInput" accept=".mid,.midi">
+      <div class="label">Click to choose a .mid file, or drag it here</div>
+      <div class="hint">Parsed client-side via a built-in MIDI reader</div>
+      <div class="filename" id="filenameLabel"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="trackPanel" style="display:none">
+    <h2>2. Tracks (all selected by default)</h2>
+    <div id="trackList"></div>
+    <div class="note">Uncheck a track to exclude it, e.g. to drop the bass line and keep melody only.</div>
+  </div>
+
+  <div class="panel" id="tunePanel" style="display:none">
+    <h2>3. Tune the pitch reference</h2>
+    <div class="field">
+      <label>Reference sound: harp_pling at rate 1.0 plays as this pitch</label>
+      <div class="row">
+        <input type="range" id="baseNote" min="36" max="84" value="60">
+        <span class="val" id="baseNoteVal">C4</span>
+      </div>
+    </div>
+    <div class="note">
+      You don't know the real pitch of harp_pling at rate 1.0 -- that's fine. Preview below uses a synth
+      approximation. If the whole song sounds too high or low once in Bloxd, shift this slider and regenerate.
+    </div>
+  </div>
+
+  <div class="panel" id="previewPanel" style="display:none">
+    <h2>4. Preview (synth approximation, played locally)</h2>
+    <button id="playBtn">Play preview</button>
+    <button id="stopBtn">Stop</button>
+    <span class="status" id="playStatus"></span>
+  </div>
+
+  <div class="panel" id="outputPanel" style="display:none">
+    <h2>5. Generated Bloxd data</h2>
+    <div class="code-box">
+      <div class="gutter" id="lineNumbers"></div>
+      <pre id="outputCode"></pre>
+    </div>
+    <div class="actions">
+      <button id="copyBtn">Copy to clipboard</button>
+      <button id="downloadBtn">Download .txt</button>
+      <button id="compactBtn">Compact</button>
+    </div>
+    <div class="note">
+      This snippet defines the note/rate data and a Bloxd-compatible tick scheduler.
+      Run playSequence(api, myId); from your Code Block to start the song.
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- Minimal standard MIDI file parser (no external deps) ----------
+function readVarLen(view, pos) {
+  let value = 0, byte;
+  do {
+    byte = view.getUint8(pos++);
+    value = (value << 7) | (byte & 0x7f);
+  } while (byte & 0x80);
+  return { value, pos };
+}
+
+function parseMidi(buffer) {
+  const view = new DataView(buffer);
+  let pos = 0;
+  function str(n) { let s=''; for (let i=0;i<n;i++) s += String.fromCharCode(view.getUint8(pos+i)); pos+=n; return s; }
+
+  if (str(4) !== 'MThd') throw new Error('Not a valid MIDI file');
+  const headerLen = view.getUint32(pos); pos += 4;
+  const format = view.getUint16(pos); pos += 2;
+  const ntrks = view.getUint16(pos); pos += 2;
+  const division = view.getUint16(pos); pos += 2;
+  pos += (headerLen - 6);
+
+  const ppq = (division & 0x8000) ? 480 : division;
+  const tracks = [];
+  const tempoEvents = [{ tick: 0, mpqn: 500000 }];
+
+  for (let t = 0; t < ntrks; t++) {
+    if (str(4) !== 'MTrk') break;
+    const trackLen = view.getUint32(pos); pos += 4;
+    const trackEnd = pos + trackLen;
+    let tick = 0;
+    let runningStatus = null;
+    const events = [];
+
+    while (pos < trackEnd) {
+      const dt = readVarLen(view, pos); pos = dt.pos; tick += dt.value;
+      let statusByte = view.getUint8(pos);
+
+      if (statusByte === 0xFF) {
+        pos++;
+        const metaType = view.getUint8(pos); pos++;
+        const len = readVarLen(view, pos); pos = len.pos;
+        if (metaType === 0x51) {
+          const mpqn = (view.getUint8(pos) << 16) | (view.getUint8(pos+1) << 8) | view.getUint8(pos+2);
+          tempoEvents.push({ tick, mpqn });
+        }
+        pos += len.value;
+      } else if (statusByte === 0xF0 || statusByte === 0xF7) {
+        pos++;
+        const len = readVarLen(view, pos); pos = len.pos;
+        pos += len.value;
+      } else {
+        if (statusByte & 0x80) { runningStatus = statusByte; pos++; }
+        else { statusByte = runningStatus; }
+        const type = statusByte & 0xF0;
+        const channel = statusByte & 0x0F;
+        const d1 = view.getUint8(pos); pos++;
+        let d2 = null;
+        if (type !== 0xC0 && type !== 0xD0) { d2 = view.getUint8(pos); pos++; }
+
+        if (type === 0x90 && d2 > 0) {
+          events.push({ tick, type: 'on', note: d1, velocity: d2, channel });
+        } else if (type === 0x80 || (type === 0x90 && d2 === 0)) {
+          events.push({ tick, type: 'off', note: d1, channel });
+        }
+      }
+    }
+    tracks.push(events);
+    pos = trackEnd;
+  }
+
+  tempoEvents.sort((a,b) => a.tick - b.tick);
+  return { ppq, tracks, tempoEvents };
+}
+
+function tickToMs(tick, ppq, tempoEvents) {
+  let ms = 0, lastTick = 0, lastMpqn = tempoEvents[0].mpqn;
+  for (const te of tempoEvents) {
+    if (te.tick >= tick) break;
+    ms += (te.tick - lastTick) * (lastMpqn / ppq) / 1000;
+    lastTick = te.tick; lastMpqn = te.mpqn;
+  }
+  ms += (tick - lastTick) * (lastMpqn / ppq) / 1000;
+  return ms;
+}
+
+function extractNotes(events, ppq, tempoEvents) {
+  const open = {};
+  const notes = [];
+  for (const ev of events) {
+    const key = ev.note;
+    if (ev.type === 'on') {
+      (open[key] = open[key] || []).push(ev.tick);
+    } else if (ev.type === 'off' && open[key] && open[key].length) {
+      const startTick = open[key].shift();
+      const startMs = tickToMs(startTick, ppq, tempoEvents);
+      const endMs = tickToMs(ev.tick, ppq, tempoEvents);
+      notes.push({ pitch: key, startMs, durMs: Math.max(50, endMs - startMs) });
+    }
+  }
+  notes.sort((a,b) => a.startMs - b.startMs);
+  return notes;
+}
+
+// ---------- Pitch -> Bloxd rate math ----------
+function rateForPitch(pitch, basePitch) {
+  return Math.pow(2, (pitch - basePitch) / 12);
+}
+function noteName(pitch) {
+  const names = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const octave = Math.floor(pitch / 12) - 1;
+  return names[pitch % 12] + octave;
+}
+
+// ---------- UI wiring ----------
+let parsedMidi = null;
+let trackNoteSets = [];
+let selectedTracks = new Set();
+let audioCtx = null;
+let previewTimeouts = [];
+
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const filenameLabel = document.getElementById('filenameLabel');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); });
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => { if (e.target.files.length) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  filenameLabel.textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      parsedMidi = parseMidi(reader.result);
+      buildTrackList();
+    } catch (err) {
+      filenameLabel.textContent = 'Could not parse this file: ' + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function buildTrackList() {
+  const list = document.getElementById('trackList');
+  list.innerHTML = '';
+  trackNoteSets = [];
+  selectedTracks = new Set();
+
+  parsedMidi.tracks.forEach((events, i) => {
+    const notes = extractNotes(events, parsedMidi.ppq, parsedMidi.tempoEvents);
+    trackNoteSets.push(notes);
+    if (notes.length === 0) return;
+
+    selectedTracks.add(i);
+
+    const row = document.createElement('div');
+    row.className = 'track-row';
+    const avgPitch = Math.round(notes.reduce((s,n)=>s+n.pitch,0) / notes.length);
+    row.innerHTML = `
+      <label>
+        <input type="checkbox" data-idx="${i}" checked>
+        Track ${i} <span class="meta">-- ${notes.length} notes, avg pitch ${noteName(avgPitch)}</span>
+      </label>
+    `;
+    list.appendChild(row);
+    row.querySelector('input').addEventListener('change', e => {
+      if (e.target.checked) selectedTracks.add(i); else selectedTracks.delete(i);
+      refreshDownstream();
+    });
+  });
+
+  document.getElementById('trackPanel').style.display = 'block';
+  document.getElementById('tunePanel').style.display = 'block';
+  document.getElementById('previewPanel').style.display = 'block';
+  document.getElementById('outputPanel').style.display = 'block';
+  refreshDownstream();
+}
+
+const baseNoteSlider = document.getElementById('baseNote');
+baseNoteSlider.addEventListener('input', () => {
+  document.getElementById('baseNoteVal').textContent = noteName(+baseNoteSlider.value);
+  refreshDownstream();
+});
+document.getElementById('baseNoteVal').textContent = noteName(+baseNoteSlider.value);
+
+function getSelectedNotes() {
+  let all = [];
+  selectedTracks.forEach(i => { all = all.concat(trackNoteSets[i]); });
+  all.sort((a,b) => a.startMs - b.startMs);
+  return all;
+}
+
+let lastOutputPretty = '';
+let isCompact = false;
+
+function renderOutput(text) {
+  const output = document.getElementById('outputCode');
+  const gutter = document.getElementById('lineNumbers');
+  output.textContent = text;
+  const lineCount = text.split('\n').length;
+  let nums = '';
+  for (let i = 1; i <= lineCount; i++) nums += i + '\n';
+  gutter.textContent = nums;
+}
+
+function refreshDownstream() {
+  const notes = getSelectedNotes();
+  const base = +baseNoteSlider.value;
+  isCompact = false;
+  document.getElementById('compactBtn').textContent = 'Compact';
+
+  if (!notes.length) {
+    renderOutput('// Select at least one track above to generate data.');
+    lastOutputPretty = document.getElementById('outputCode').textContent;
+    return;
+  }
+
+  const seq = notes.map(n => ({
+    pitch: n.pitch,
+    note: noteName(n.pitch),
+    rate: +rateForPitch(n.pitch, base).toFixed(4),
+    startMs: Math.round(n.startMs),
+    durMs: Math.round(n.durMs)
+  }));
+
+  const text =
+`// Full note sequence generated from your MIDI file (${seq.length} notes).
+// Schedules playSound calls at the right time offsets to auto-play the song.
+
+const NOTE_SEQUENCE = ${JSON.stringify(seq, null, 2)};
+
+let songStartTime = 0;
+let songPlaying = false;
+let songIndex = 0;
+let songPlayerId = null;
+let songVolume = 1.0;
+
+function playSequence(api, playerId, volume = 1.0) {
+  songPlayerId = playerId;
+  songVolume = volume;
+  songStartTime = api.now();
+  songIndex = 0;
+  songPlaying = true;
+}
+
+tick = function() {
+  if (!songPlaying || songPlayerId === null) return;
+
+  const elapsed = api.now() - songStartTime;
+
+  while (
+    songIndex < NOTE_SEQUENCE.length &&
+    NOTE_SEQUENCE[songIndex].startMs <= elapsed
+  ) {
+    const n = NOTE_SEQUENCE[songIndex];
+
+    api.playSound(
+      songPlayerId,
+      "harp_pling",
+      songVolume,
+      n.rate
+    );
+
+    songIndex++;
+  }
+
+  if (songIndex >= NOTE_SEQUENCE.length) {
+    songPlaying = false;
+  }
+};
+
+// Example: playSequence(api, myId);
+`;
+
+  renderOutput(text);
+  lastOutputPretty = text;
+}
+
+// ---------- Compact (minify) ----------
+function minifyCode(code) {
+  const noComments = code.split('\n').map(line => {
+    const idx = line.indexOf('//');
+    return idx !== -1 ? line.slice(0, idx) : line;
+  }).join('\n');
+  let collapsed = noComments.replace(/\s+/g, ' ').trim();
+  collapsed = collapsed.replace(/\s*([{}()\[\];,:=.])\s*/g, '$1');
+  return collapsed;
+}
+
+document.getElementById('compactBtn').addEventListener('click', () => {
+  const btn = document.getElementById('compactBtn');
+  if (!lastOutputPretty) return;
+  isCompact = !isCompact;
+  if (isCompact) {
+    renderOutput(minifyCode(lastOutputPretty));
+    btn.textContent = 'Expand';
+  } else {
+    renderOutput(lastOutputPretty);
+    btn.textContent = 'Compact';
+  }
+});
+
+// ---------- Local synth preview (Web Audio, no samples involved) ----------
+document.getElementById('playBtn').addEventListener('click', () => {
+  stopPreview();
+  const notes = getSelectedNotes();
+  if (!notes.length) return;
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  const t0 = audioCtx.currentTime + 0.1;
+  const startRef = notes[0].startMs;
+
+  notes.forEach(n => {
+    const startSec = (n.startMs - startRef) / 1000;
+    const durSec = Math.min(n.durMs / 1000, 1.2);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = 440 * Math.pow(2, (n.pitch - 69) / 12);
+    gain.gain.setValueAtTime(0.0001, t0 + startSec);
+    gain.gain.exponentialRampToValueAtTime(0.25, t0 + startSec + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + startSec + durSec);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0 + startSec);
+    osc.stop(t0 + startSec + durSec + 0.05);
+  });
+
+  document.getElementById('playStatus').textContent = 'Playing preview...';
+  const totalMs = (notes[notes.length-1].startMs - startRef) + notes[notes.length-1].durMs + 300;
+  previewTimeouts.push(setTimeout(() => {
+    document.getElementById('playStatus').textContent = '';
+  }, totalMs));
+});
+
+document.getElementById('stopBtn').addEventListener('click', stopPreview);
+function stopPreview() {
+  previewTimeouts.forEach(clearTimeout);
+  previewTimeouts = [];
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  document.getElementById('playStatus').textContent = '';
+}
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = document.getElementById('outputCode').textContent;
+  const btn = document.getElementById('copyBtn');
+  const showCopied = () => {
+    const old = btn.textContent; btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = old, 1200);
+  };
+  const showFailed = () => {
+    const old = btn.textContent; btn.textContent = 'Click text box below, then Ctrl+C';
+    setTimeout(() => btn.textContent = old, 2500);
+  };
+  const tryModernClipboard = () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(showCopied).catch(showFailed);
+    } else {
+      showFailed();
+    }
+  };
+
+  // Synchronous execCommand path first -- no permission prompt, works immediately
+  // in most browsers including file:// pages, so it avoids the "first click just
+  // shows a permission dialog" issue.
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (ok) showCopied(); else tryModernClipboard();
+  } catch (e) {
+    tryModernClipboard();
+  }
+});
+
+// Manual backup: clicking directly in the code box selects everything so
+// Ctrl+C / Cmd+C always works even if the button above has trouble.
+document.getElementById('outputCode').addEventListener('click', function() {
+  const range = document.createRange();
+  range.selectNodeContents(this);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
+document.getElementById('downloadBtn').addEventListener('click', () => {
+  const text = document.getElementById('outputCode').textContent;
+  const a = document.createElement('a');
+  a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(text);
+  a.download = 'bloxd_note_data.txt';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+});
+</script>
+</body>
+</html>
