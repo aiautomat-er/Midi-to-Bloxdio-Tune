@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Midi → Bloxd Tune</title>
-    <meta name="description" content="Turn MIDI or Tone.js-friendly JSON into a Bloxd.io World Code tune." />
+    <meta name="description" content="Turn a MIDI file into a Bloxd.io World Code tune." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -16,17 +16,17 @@
         <a class="brand" href="/" aria-label="Midi to Bloxd Tune home"><span>♩</span> MIDI<span class="arrow">→</span>BLOXD</a>
         <div class="eyebrow"><i></i> Browser based · Your files stay here</div>
         <h1>Turn your MIDI into<br /><em>a Bloxd tune.</em></h1>
-        <p>Drop in a MIDI or Tone.js-friendly JSON song, choose the musical layer you want, and get tidy World Code that plays it back with Bloxd’s note sounds.</p>
+        <p>Drop in a song, choose the musical layer you want, and get tidy World Code that plays it back with Bloxd’s note sounds.</p>
       </header>
 
       <section class="workspace" aria-label="MIDI converter">
         <div class="panel input-panel">
-          <div class="panel-title"><span class="step">01</span><h2>Choose a music file</h2></div>
+          <div class="panel-title"><span class="step">01</span><h2>Choose a MIDI file</h2></div>
           <label class="dropzone" id="dropzone" for="midi-file">
-            <input id="midi-file" type="file" accept=".mid,.midi,.json,application/json,audio/midi,audio/x-midi" />
+            <input id="midi-file" type="file" accept=".mid,.midi,audio/midi,audio/x-midi" />
             <span class="upload-icon">↑</span>
-            <strong>Drop your .mid or .json file here</strong>
-            <small>or click to browse · Standard MIDI or Tone.js-friendly JSON</small>
+            <strong>Drop your .mid file here</strong>
+            <small>or click to browse · Standard MIDI files only</small>
           </label>
           <div class="file-card" id="file-card" hidden><span class="file-icon">♫</span><div><strong id="file-name"></strong><small id="file-detail"></small></div><button id="clear-file" title="Remove file" aria-label="Remove file">×</button></div>
 
@@ -36,14 +36,13 @@
             <label>Timing <select id="timing-select" disabled><option value="original">Keep MIDI timing</option><option value="grid">Snap to 1/16</option></select></label>
           </div>
           <button class="convert" id="convert" disabled><span>Generate Bloxd tune</span><b>→</b></button>
-          <p class="note">Tone.js JSON accepts notes with <code>time</code>, <code>duration</code>, <code>midi</code>, and <code>velocity</code>.</p>
+          <p class="note">Tip: melodies with one note at a time create the cleanest result.</p>
         </div>
 
         <div class="panel output-panel">
           <div class="panel-title"><span class="step">02</span><h2>Your tune code</h2><span class="status" id="status">Waiting for MIDI</span></div>
           <div class="code-wrap"><pre id="code-output"><code>// Your Bloxd World Code will appear here.
 // Upload a .mid file to begin.</code></pre><button id="copy" disabled>Copy code</button></div>
-          <div class="output-actions"><button class="preview" id="preview" disabled><span class="play-symbol">▶</span> Test play tune</button><span id="preview-help">Generate a tune to test it here</span></div>
           <div class="stats" id="stats"><div><span>Notes</span><strong>—</strong></div><div><span>Length</span><strong>—</strong></div><div><span>Tempo</span><strong>—</strong></div></div>
         </div>
       </section>
